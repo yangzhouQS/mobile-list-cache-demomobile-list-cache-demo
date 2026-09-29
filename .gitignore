@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+.idea/
+vue3-protal-app-framework-library/
