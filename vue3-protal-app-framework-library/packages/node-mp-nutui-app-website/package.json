@@ -17,7 +17,7 @@
     "@mctech/infra-cloud": "^4.2.2",
     "@mctech/infra-core": "^4.4.2",
     "@mctech/js-fs-client": "^4.2.9",
-    "crypto-js": "4.1.1",
+    "crypto-js": "4.2.0",
     "vue-page-stack": "file:./lib/vue-page-stack",
     "@cs/nutui-pro": "^1.3.22",
     "@nutui/icons-vue": "^0.1.1",
