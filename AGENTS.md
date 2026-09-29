@@ -1,0 +1,90 @@
+# AGENTS.md
+
+面向在本仓库工作的 AI 编码代理的项目说明。人类开发者也可将其作为快速上手文档。
+
+## 项目概述
+
+移动端列表缓存演示项目（vue3 + vue-router + vite）。核心是自研路由级长期缓存组件
+`PageCache`（对标 vue-page-stack / 官方 KeepAlive，但按路由 key 缓存、离屏存 DOM、
+不拦截路由）。UI 库 NutUI 4。
+
+## 常用命令
+
+```bash
+npm run dev         # vite 开发服务器（端口 5175）
+npm run build       # 生产构建
+npm run test:unit   # vitest 单元测试（tests/unit）
+npm run test:e2e    # Playwright e2e（tests/e2e，自动拉起 vite dev server）
+npm run test        # 单测 + e2e
+npm run typecheck   # vue-tsc --noEmit（含 .vue 文件）
+```
+
+- e2e 依赖 chromium：首次运行需 `npx playwright install chromium`。
+- e2e 配置 `reuseExistingServer`：本地已有 5175 端口服务会直接复用。
+
+## 目录结构与关键文件
+
+```
+src/
+  app.vue                     # PageCache 的实际使用现场（router-view v-slot 包裹）
+  components/page-cache.ts    # ★ 核心缓存组件（对齐 Vue 3.5 KeepAlive 内部实现）
+  utils/page-cache-control.ts # markPageRefresh 等硬刷新标记（普通 Set，非响应式）
+  utils/list-keep-alive.ts    # 列表页滚动保存/恢复 + 刷新标记（onActivated 钩子）
+  utils/selection-holder.ts   # 跨页选择结果暂存（选择页 -> 表单页回填）
+  router/index.ts             # hash 路由，6 个路由，懒加载
+  views/                      # home / order-list / order-add / order-detail / order-edit / option-select
+tests/
+  unit/page-cache.spec.ts     # 参照 vue/core KeepAlive.spec.ts 的 21 个用例
+  unit/page-cache-control.spec.ts
+  e2e/page-cache.e2e.spec.ts  # 6 个真实浏览器场景
+libs/                         # 参考源码（vue core、vue-router、vue-page-stack），只读，勿改勿引
+```
+
+组件详细文档见 `docs/page-cache.md`。
+
+## PageCache 关键约束（改代码前必读）
+
+1. **内部通道实现**：组件标记 `__isKeepAlive: true` 骗过渲染器，通过
+   `instance.ctx.activate/deactivate` 与渲染器通信。渲染器内部字段通过
+   `InternalComponentInstance` / `InternalVNode` 结构类型访问（公开类型未暴露，
+   运行时存在）。若升级 vue 大版本，需对照 `libs/core` KeepAlive 重新核对。
+2. **activate 内的 key 对齐**（page-cache.ts 中已注释）：官方 KeepAlive 缓存 key
+   即 vnode.key；本组件 `keyBy='path'` 时 query 变化会以不同 key 的 vnode 复用
+   同一实例，必须对齐旧 vnode.key，否则 patch 走卸载分支会崩溃。删除该段会复现
+   单测 `keyBy=path` 用例与 e2e 的失败。
+3. **include 匹配的是缓存 key**（keyBy=path 时为 route.path；keyBy=fullPath 时含
+   query，字符串模式是精确匹配）。fullPath 维度下用正则（如 `/^\/one/`）。
+4. **勿与 `<keep-alive>` 或 vue-page-stack 叠用**包裹同一 router-view。
+5. `utils/page-cache-control.ts` 的 Set 刻意不做成响应式：PageCache 在 render 中
+   调用 `consumePageRefresh`（render 期副作用），改成 reactive 会导致递归更新。
+
+## 代码与提交约定
+
+- TS strict；无独立 lint 配置，以 typecheck 为准。
+- 注释使用中文，解释"为什么"并标注对应的 vue/core issue 号（如 #7105、#11831）。
+- 不主动提交；提交信息跟随仓库既有风格（当前无历史，用简洁祈使句英文或中文均可）。
+
+## 测试编写注意事项
+
+**单元测试**（vitest + happy-dom，globals 已开）：
+- 用 `mountApp()` 测试脚手架（memory history 路由 + PageCache 包裹），位于
+  `tests/unit/page-cache.spec.ts` 顶部，新用例直接复用。
+- 生命周期断言用 `assertHookCalls(view, [created, mounted, activated, deactivated, unmounted])`。
+- 注意官方语义边界：不在 include 的页面挂载**不触发** activated；include 修剪
+  当前活跃页面时，离开走真实 unmount（deactivated 不触发）。
+- `findPageCacheInstance(root)` 可拿到组件实例读取 dev 期 `__v_cache` 断言缓存态。
+
+**E2E 测试**（Playwright，两个已踩过的坑）：
+1. NutUI 组件渲染为 `<view>` 自定义标签而非 `<button>`：`getByRole('button')`
+   匹配不到，用 `page.locator('.nut-button', { hasText: '...' })`。
+2. Playwright 点击前会把目标自动滚动进可视区：验证"滚动位置恢复"类场景时，
+   必须点击滚动后仍可见的卡片（`visibleCard(page)` 即 nth(7)），点首张卡片会把
+   容器滚回顶部污染断言。
+3. 快速导航用例不可用 `page.goBack()` 连按——会退出 SPA 历史到 about:blank；
+   循环导航用页头返回按钮（router.back），并在 `page.goto` 断言前保持 SPA 内跳转。
+
+## 其它
+
+- `libs/*/CLAUDE.md` 是 git-crypt 加密文件（乱码），忽略即可。
+- mock 接口在 `src/views/order/order-mock.ts`（500ms 延迟分页），界面上
+  "列表请求：N 次"来自 `requestStats`，是 e2e 验证缓存命中的观测点。

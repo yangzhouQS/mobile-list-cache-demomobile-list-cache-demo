@@ -41,7 +41,7 @@ export type BackRefreshMode =
 /** 返回列表页；refresh 决定返回后行为（false=保持位置 / true=复用实例刷新数据 / 'hard'=全新渲染） */
 export const backToList = (
   router: Router,
-  options: { listKey: string; routePath?: string; refresh?: BackRefreshMode } = {}
+  options: { listKey: string; routePath?: string; refresh?: BackRefreshMode }
 ) => {
   const { listKey, routePath, refresh = false } = options
   if (refresh === 'hard') {
@@ -84,7 +84,7 @@ export const useListKeepAlive = (options: UseListKeepAliveOptions) => {
 
   const getScrollTop = () => {
     const target = getScrollTarget()
-    return target === window ? window.scrollY : target.scrollTop
+    return target === window ? window.scrollY : (target as HTMLElement).scrollTop
   }
 
   const setScrollTop = (top: number) => {
@@ -92,7 +92,7 @@ export const useListKeepAlive = (options: UseListKeepAliveOptions) => {
     if (target === window) {
       window.scrollTo(0, top)
     } else {
-      target.scrollTop = top
+      ;(target as HTMLElement).scrollTop = top
     }
   }
 

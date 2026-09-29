@@ -1,7 +1,7 @@
 <template>
   <div class="home-page">
     <div class="home-title">移动端列表缓存演示</div>
-    <div class="home-sub">vue3 + vue-router + vue-page-stack</div>
+    <div class="home-sub">vue3 + vue-router + PageCache（路由级长期缓存）</div>
 
     <div class="home-scenarios">
       <div class="home-scenario">
