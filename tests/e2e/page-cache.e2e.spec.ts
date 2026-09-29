@@ -152,8 +152,7 @@ test('add page keeps selections after visiting select pages', async ({ page }) =
   expect(firstName).toBeTruthy()
 })
 
-test('rapid navigation does not deadlock and cache still works', async ({ page }) => {
-  const pageErrors: string[] = []
+test('rapid navigation does not deadlock and cache still works', async ({ page }) => {  const pageErrors: string[] = []
   page.on('pageerror', (err) => pageErrors.push(String(err)))
 
   await gotoList(page)
@@ -178,4 +177,33 @@ test('rapid navigation does not deadlock and cache still works', async ({ page }
   expect(await listRequestCount(page)).toBe(countBefore)
   // 无未捕获错误、无卡死
   expect(pageErrors).toEqual([])
+})
+
+test('scroll position survives repeated detail round-trips (offscreen scroll-event clobber regression)', async ({ page }) => {
+  await gotoList(page)
+  const scrollEl = page.locator('.order-scroll')
+
+  // 连续多轮"滚动 -> 详情 -> 返回"：每轮恢复的滚动位置都必须保持。
+  // 回归背景：列表 DOM 移入离屏缓存容器时 scrollTop 被浏览器归零并异步派发
+  // scroll 事件（在游离子树内派发，window 捕获不到），list-keep-alive 的兜底
+  // 滚动监听若不忽略离屏事件，会把离开守卫保存的真实位置覆盖为 0，
+  // 第 2 轮起恢复失败（时序竞态，离屏事件晚于守卫执行时必现）。
+  for (let round = 1; round <= 3; round++) {
+    await scrollEl.evaluate((el) => {
+      el.scrollTop = 600
+    })
+    await expect
+      .poll(() => scrollEl.evaluate((el) => Math.round(el.scrollTop)))
+      .toBeGreaterThan(400)
+
+    await visibleCard(page).click()
+    await expect(page.getByText('单据编号')).toBeVisible()
+    await page.locator('.order-header-icon').click()
+    await expect(page.locator('.order-card').first()).toBeVisible()
+
+    // 返回后恢复位置必须仍然有效（bug 表现为恢复为 0）
+    await expect
+      .poll(() => scrollEl.evaluate((el) => Math.round(el.scrollTop)))
+      .toBeGreaterThan(400)
+  }
 })

@@ -83,9 +83,13 @@ interface MountOptions {
   /** PageCache 的子节点包一层 Suspense（验证 PageCache > Suspense > async） */
   suspense?: boolean
   /** PageCache 外层包一层 Transition（文档推荐的 Transition > KeepAlive 顺序） */
-  transition?: boolean
+  transition?: boolean | { mode?: 'out-in' }
   /** 传入 app.config.errorHandler，捕获生命周期钩子内抛出的错误 */
   onError?: (err: unknown) => void
+  /** 子组件是否带 :key（默认按 route.fullPath 加 key） */
+  childKey?: boolean
+  /** 显式覆盖缓存 key（对应 PageCache 的 cacheKey prop） */
+  cacheKey?: string
 }
 
 interface TestCtx {
@@ -118,10 +122,14 @@ async function mountApp(options: MountOptions): Promise<TestCtx> {
           default: ({ Component }: { Component: Component | null }) => {
             if (!Component) return null
             // PageCache 的子节点：可选包一层 Suspense（Suspense 在 PageCache 内部）
+            const childProps = {
+              ...(options.childKey === false ? {} : { key: route.fullPath }),
+              ...(options.childProps ?? {})
+            }
             const child = () =>
               options.suspense
-                ? h(Suspense, null, () => [h(Component as any, { key: route.fullPath, ...(options.childProps ?? {}) })])
-                : h(Component as any, { key: route.fullPath, ...(options.childProps ?? {}) })
+                ? h(Suspense, null, () => [h(Component as any, childProps)])
+                : h(Component as any, childProps)
             const pageCache = () =>
               h(
                 PageCache,
@@ -129,12 +137,15 @@ async function mountApp(options: MountOptions): Promise<TestCtx> {
                   include: options.includeRef ? options.includeRef.value : options.include!,
                   exclude: options.excludeRef ? options.excludeRef.value : options.exclude,
                   max: options.max,
-                  keyBy: options.keyBy
+                  keyBy: options.keyBy,
+                  cacheKey: options.cacheKey
                 },
                 () => [child()]
               )
             if (options.transition) {
-              return h(Transition, { name: 'fade' }, () => [pageCache()])
+              const tProps =
+                typeof options.transition === 'object' ? options.transition : {}
+              return h(Transition, { name: 'fade', ...tProps }, () => [pageCache()])
             }
             return pageCache()
           }
@@ -665,5 +676,207 @@ describe('PageCache', () => {
     expect(pc.__v_cache.size).toBe(1)
     await ctx.nav('/one')
     expect(pc.__v_cache.size).toBe(1)
+  })
+
+  test('warns and cleans stale entry when unkeyed child spans multiple cache keys', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const shared = createSpyView('shared')
+      const ctx = await mountApp({
+        include: ['/a', '/b'],
+        childKey: false,
+        views: { '/a': shared, '/b': shared },
+        initial: '/a'
+      })
+      const pc = findPageCacheInstance(ctx.root)
+      expect(pc.__v_cache.size).toBe(1)
+
+      // 同组件不加 key 跨路由：原地更新复用实例，旧 key 条目被清理并告警
+      await ctx.nav('/b')
+      expect(pc.__v_cache.size).toBe(1)
+      expect(warnSpy).toHaveBeenCalled()
+      expect((shared.created as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1)
+
+      await ctx.nav('/a')
+      expect(pc.__v_cache.size).toBe(1)
+      expect((shared.created as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1)
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  test('cacheKey prop overrides route-derived key (same component reuses one entry)', async () => {
+    const shared = createSpyView('shared')
+    const ctx = await mountApp({
+      // cacheKey 覆盖时 include 匹配的是覆盖后的 key
+      include: ['/fixed'],
+      cacheKey: '/fixed',
+      views: { '/a': shared, '/b': shared },
+      initial: '/a'
+    })
+
+    ;(ctx.root.querySelector('.view-bump') as HTMLElement).click()
+    await ctx.nav('/b')
+    // 同一 key + 同一组件：跨路由复用同一实例（activate 内 key 对齐）
+    assertHookCalls(shared, [1, 1, 2, 1, 0])
+    expect(ctx.root.textContent).toContain('shared!')
+  })
+
+  test('cache entry is not reused across different component types', async () => {
+    const one = createSpyView('one')
+    const two = createSpyView('two')
+    const ctx = await mountApp({
+      include: ['/fixed'],
+      cacheKey: '/fixed',
+      views: { '/one': one, '/two': two },
+      initial: '/one'
+    })
+
+    await ctx.nav('/two')
+    // 类型不匹配：one 的旧条目被清理。清理时 one 是当前活跃实例（resetShapeFlag
+    // 语义），离开走真实 unmount（deactivated 不触发），two 全新挂载
+    assertHookCalls(one, [1, 1, 1, 0, 1])
+    assertHookCalls(two, [1, 1, 1, 0, 0])
+
+    await ctx.nav('/one')
+    assertHookCalls(two, [1, 1, 1, 0, 1])
+    assertHookCalls(one, [2, 2, 2, 0, 1])
+  })
+
+  test('max=1 keeps only the latest entry', async () => {
+    const a = createSpyView('a')
+    const b = createSpyView('b')
+    const ctx = await mountApp({
+      include: ['/a', '/b'],
+      max: 1,
+      views: { '/a': a, '/b': b },
+      initial: '/a'
+    })
+
+    await ctx.nav('/b')
+    // 进入 b 即淘汰 a：max=1 下修剪的是当前活跃条目（对齐官方 resetShapeFlag
+    // 语义）——离开走真实 unmount，deactivated 不触发
+    assertHookCalls(a, [1, 1, 1, 0, 1])
+    await ctx.nav('/a')
+    // 回到 a 又淘汰 b，a 全新渲染
+    assertHookCalls(a, [2, 2, 2, 0, 1])
+    assertHookCalls(b, [1, 1, 1, 0, 1])
+  })
+
+  test('in-place include mutation (splice) prunes cache', async () => {
+    const one = createSpyView('one')
+    const two = createSpyView('two')
+    const includeRef = ref<RouteMatchPattern>(['/one', '/two'])
+    const ctx = await mountApp({
+      includeRef,
+      views: { '/one': one, '/two': two },
+      initial: '/one'
+    })
+
+    await ctx.nav('/two')
+    // 原地变异（而非整体替换）也要触发修剪
+    ;(includeRef.value as string[]).splice(1)
+    await nextTick()
+    await nextTick()
+    // 当前活跃实例不立即卸载
+    assertHookCalls(two, [1, 1, 1, 0, 0])
+
+    await ctx.nav('/one')
+    assertHookCalls(two, [1, 1, 1, 0, 1])
+    await ctx.nav('/two')
+    assertHookCalls(two, [2, 2, 1, 0, 1])
+  })
+
+  test('error thrown in deactivated hook does not break navigation', async () => {
+    const errors: unknown[] = []
+    const one = defineComponent({
+      name: 'one',
+      setup() {
+        onDeactivated(() => {
+          throw new Error('deactivate-boom')
+        })
+        return () => h('div', { class: 'view-one' }, 'one')
+      }
+    })
+    const two = createSpyView('two')
+    const ctx = await mountApp({
+      include: ['/one', '/two'],
+      views: { '/one': one, '/two': two },
+      initial: '/one',
+      onError: (err) => errors.push(err)
+    })
+
+    await ctx.nav('/two')
+    expect(ctx.root.textContent).toContain('two')
+    expect(errors.length).toBeGreaterThan(0)
+
+    await ctx.nav('/one')
+    expect(ctx.root.textContent).toContain('one')
+    await ctx.nav('/two')
+    expect(ctx.root.textContent).toContain('two')
+  })
+
+  test('unmounting releases all cached DOM nodes', async () => {
+    const one = createSpyView('one')
+    const two = createSpyView('two')
+    const ctx = await mountApp({
+      include: ['/one', '/two'],
+      views: { '/one': one, '/two': two },
+      initial: '/one'
+    })
+    const oneInner = ctx.root.querySelector('.view-msg')!.parentElement!
+    await ctx.nav('/two')
+    const twoInner = ctx.root.querySelector('.view-msg')!.parentElement!
+    // one 已离屏（不在文档中），two 活跃
+    expect(oneInner.isConnected).toBe(false)
+    expect(twoInner.isConnected).toBe(true)
+
+    ctx.destroy()
+    expect(twoInner.isConnected).toBe(false)
+  })
+
+  test('keyBy=fullPath with max prunes LRU across query variants', async () => {
+    const one = createSpyView('one')
+    const ctx = await mountApp({
+      include: [/^\/one/],
+      keyBy: 'fullPath',
+      max: 2,
+      views: { '/one': one, '/two': createSpyView('two') },
+      initial: '/one?x=1'
+    })
+
+    await ctx.nav('/one?x=2')
+    await ctx.nav('/one?x=3') // 超出 max=2：淘汰最旧的 x=1
+    const pc = findPageCacheInstance(ctx.root)
+    expect(pc.__v_cache.size).toBe(2)
+
+    // x=1 已被淘汰：全新渲染；x=1 重新进入又淘汰 x=2（累计卸载 2 次）
+    await ctx.nav('/one?x=1')
+    assertHookCalls(one, [4, 4, 4, 3, 2])
+  })
+
+  test('same-flush double navigation settles on the final route without errors', async () => {
+    const one = createSpyView('one')
+    const two = createSpyView('two')
+    const three = createSpyView('three')
+    const ctx = await mountApp({
+      include: ['/one', '/two', '/three'],
+      views: { '/one': one, '/two': two, '/three': three },
+      initial: '/one'
+    })
+
+    // 不 await 第一次跳转，同 flush 内二次跳转（第一次被取消）
+    await Promise.allSettled([
+      ctx.router.push('/two').catch(() => undefined),
+      ctx.router.push('/three')
+    ])
+    await nextTick()
+    await nextTick()
+
+    expect(ctx.root.textContent).toContain('three')
+    // 中途被取代的导航不应留下半渲染状态
+    await ctx.nav('/one')
+    expect(ctx.root.textContent).toContain('one')
+    assertHookCalls(one, [1, 1, 2, 1, 0])
   })
 })

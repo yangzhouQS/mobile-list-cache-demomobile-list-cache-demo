@@ -101,8 +101,20 @@ export const useListKeepAlive = (options: UseListKeepAliveOptions) => {
     scrollPosMap.set(listKey, getScrollTop())
   })
 
-  /** 兜底：滚动过程持续记录（也用于离开守卫未触发的边界场景） */
+  /**
+   * 兜底：滚动过程持续记录（也用于离开守卫未触发的边界场景）。
+   *
+   * 注意：必须忽略元素已脱离文档（PageCache/keep-alive 离屏缓存）时的 scroll
+   * 事件——DOM 移入离屏容器时浏览器会把 scrollTop 归零并异步派发 scroll 事件
+   * （该事件在游离子树内派发，window 捕获阶段监听不到，但直接挂在元素上的
+   * 本监听器仍会收到），若照常记录会把离开守卫保存的真实位置覆盖为 0，
+   * 导致返回列表后滚动位置丢失（时序竞态：离屏事件晚于守卫执行时必现）。
+   */
   const handleScrollEvent = () => {
+    const target = getScrollTarget()
+    if (target !== window && !(target as HTMLElement).isConnected) {
+      return
+    }
     scrollPosMap.set(listKey, getScrollTop())
   }
 

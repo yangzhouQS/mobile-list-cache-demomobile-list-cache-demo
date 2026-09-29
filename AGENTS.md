@@ -34,9 +34,9 @@ src/
   router/index.ts             # hash 路由，6 个路由，懒加载
   views/                      # home / order-list / order-add / order-detail / order-edit / option-select
 tests/
-  unit/page-cache.spec.ts     # 参照 vue/core KeepAlive.spec.ts 的 21 个用例
+  unit/page-cache.spec.ts     # 参照 vue/core KeepAlive.spec.ts 的 30 个用例
   unit/page-cache-control.spec.ts
-  e2e/page-cache.e2e.spec.ts  # 6 个真实浏览器场景
+  e2e/page-cache.e2e.spec.ts  # 7 个真实浏览器场景
 libs/                         # 参考源码（vue core、vue-router、vue-page-stack），只读，勿改勿引
 ```
 
@@ -53,10 +53,15 @@ libs/                         # 参考源码（vue core、vue-router、vue-page-
    同一实例，必须对齐旧 vnode.key，否则 patch 走卸载分支会崩溃。删除该段会复现
    单测 `keyBy=path` 用例与 e2e 的失败。
 3. **include 匹配的是缓存 key**（keyBy=path 时为 route.path；keyBy=fullPath 时含
-   query，字符串模式是精确匹配）。fullPath 维度下用正则（如 `/^\/one/`）。
+   query，字符串模式是精确匹配；传 cacheKey 覆盖时匹配覆盖后的 key）。fullPath
+   维度下用正则（如 `/^\/one/`）。
 4. **勿与 `<keep-alive>` 或 vue-page-stack 叠用**包裹同一 router-view。
 5. `utils/page-cache-control.ts` 的 Set 刻意不做成响应式：PageCache 在 render 中
-   调用 `consumePageRefresh`（render 期副作用），改成 reactive 会导致递归更新。
+   窥探 `hasPageRefresh`、渲染提交后消费 `consumePageRefresh`，改成 reactive
+   会导致递归更新。
+6. **两类自动防护勿删**：缓存条目与子组件类型不匹配时按未命中清理（防跨组件
+   复用实例导致 activate patch 崩溃）；未加 :key 的子组件跨路由复用时清理旧
+   key 条目并 dev 告警（防多缓存条目别名同一实例）。
 
 ## 代码与提交约定
 
@@ -82,9 +87,28 @@ libs/                         # 参考源码（vue core、vue-router、vue-page-
    容器滚回顶部污染断言。
 3. 快速导航用例不可用 `page.goBack()` 连按——会退出 SPA 历史到 about:blank；
    循环导航用页头返回按钮（router.back），并在 `page.goto` 断言前保持 SPA 内跳转。
+4. Transition `mode="out-in"` 在 happy-dom 下离场永远不完成（官方 KeepAlive
+   同样卡住，环境限制），单测只覆盖 default 模式，out-in 需真实浏览器验证。
 
 ## 其它
 
 - `libs/*/CLAUDE.md` 是 git-crypt 加密文件（乱码），忽略即可。
 - mock 接口在 `src/views/order/order-mock.ts`（500ms 延迟分页），界面上
   "列表请求：N 次"来自 `requestStats`，是 e2e 验证缓存命中的观测点。
+
+## 浏览器 MCP（辅助测试验证）
+
+项目根 `kilo.json` 注册了 Playwright MCP（`npx @playwright/mcp@latest`），
+提供真实浏览器操作能力（导航/截图/快照/console/network），用于：
+
+- 复现 e2e 失败现场（配合 `npx playwright show-trace` 之外的手动复验）；
+- 目测验证 PageCache 行为（滚动恢复、离屏 DOM、快速导航）；
+- 查看 dev server 控制台与网络请求（`http://localhost:5175`，`npm run dev` 拉起）。
+
+使用约定：
+
+- MCP 定位是**辅助验证**，不是回归手段；可回归的结论必须落成
+  `tests/e2e` 用例（快照/console 类只读工具已配置为自动放行，交互类默认询问）。
+- 浏览器复用本仓库已安装的 chromium（`npx playwright install chromium`）。
+- MCP 运行产物目录 `.playwright-mcp/` 已在 `.gitignore` 中，勿提交。
+- 配置修改（`kilo.json`）需重启会话后生效。

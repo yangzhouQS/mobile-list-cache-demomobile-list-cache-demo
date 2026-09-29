@@ -16,5 +16,8 @@ export const markPageRefresh = (routePath: string) => {
 /** 消费刷新标记：返回下次到达是否需要全新渲染 */
 export const consumePageRefresh = (routePath: string) => refreshRouteSet.delete(routePath)
 
+/** 窥探刷新标记（不消费）：PageCache 在 render 期窥探、提交后消费，避免渲染被丢弃时丢失标记 */
+export const hasPageRefresh = (routePath: string) => refreshRouteSet.has(routePath)
+
 /** 清空所有刷新标记 */
 export const clearPageRefresh = () => refreshRouteSet.clear()

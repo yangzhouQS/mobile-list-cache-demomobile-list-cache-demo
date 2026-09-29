@@ -15,7 +15,7 @@ import {
 } from 'vue'
 import { useRoute } from 'vue-router'
 import type { ComponentInternalInstance, PropType, VNode } from 'vue'
-import { consumePageRefresh } from '../utils/page-cache-control'
+import { consumePageRefresh, hasPageRefresh } from '../utils/page-cache-control'
 
 /**
  * PageCache：路由级长期缓存组件（对齐 Vue 3.5 KeepAlive 内部实现）
@@ -197,6 +197,15 @@ export const PageCache = defineComponent({
     keyBy: {
       type: String as PropType<'path' | 'fullPath'>,
       default: 'path'
+    },
+    /**
+     * 显式覆盖缓存 key（优先于 keyBy 的路由推导）。
+     * 用于嵌套路由/命名视图等全局 route 与实际渲染内容不一致的场景，
+     * 如 :cache-key="route.matched[1]?.path"
+     */
+    cacheKey: {
+      type: String as PropType<string>,
+      default: undefined
     }
   },
   setup(props, { slots }) {
@@ -218,6 +227,8 @@ export const PageCache = defineComponent({
     const keys = new Set<string>()
     let current: VNode | null = null
     let pendingCacheKey: string | null = null
+    /** 上一次渲染命中的缓存 key（用于未加 key 子组件的别名检测） */
+    let currentCacheKey: string | null = null
 
     const parentSuspense = (instance.suspense ?? null) as SuspenseBoundaryLike | null
     const {
@@ -355,10 +366,13 @@ export const PageCache = defineComponent({
           const vnode = getInnerChild(subTree)
           if (vnode.component) {
             cache.set(pendingCacheKey!, vnode)
+            // 渲染提交后才消费硬刷新标记（render 可能被丢弃，render 期消费会丢失标记）
+            consumePageRefresh(pendingCacheKey!)
           }
         })
       } else {
         cache.set(pendingCacheKey, getInnerChild(subTree))
+        consumePageRefresh(pendingCacheKey)
       }
     }
     onMounted(cacheSubtree)
@@ -412,7 +426,8 @@ export const PageCache = defineComponent({
         return vnode
       }
 
-      const cacheKey = props.keyBy === 'fullPath' ? route.fullPath : route.path
+      const cacheKey =
+        props.cacheKey ?? (props.keyBy === 'fullPath' ? route.fullPath : route.path)
       const included =
         matches(props.include, cacheKey) &&
         !(props.exclude && matches(props.exclude, cacheKey))
@@ -421,19 +436,69 @@ export const PageCache = defineComponent({
         // 不在缓存范围：清掉标志位，走正常挂载/卸载（#11717）
         vnode.shapeFlag &= ~SHAPE_FLAGS.COMPONENT_SHOULD_KEEP_ALIVE
         current = vnode
+        currentCacheKey = null
         return rawVNode
       }
 
+      // 未加 :key 的子组件跨缓存 key 复用检测：官方 KeepAlive 的缓存 key 即
+      // vnode.key 天然不会发生；本组件按路由 key 缓存，若同一子 vnode（同 type
+      // 同 key）被多个路由 key 复用，patch 会原地更新，产生多个缓存条目别名到
+      // 同一实例。此处删除旧 key 的条目（实例保持活跃不受影响）并告警。
+      if (
+        currentCacheKey != null &&
+        cacheKey !== currentCacheKey &&
+        current &&
+        isSameVNodeType(vnode, current)
+      ) {
+        if (import.meta.env?.DEV) {
+          console.warn(
+            `[PageCache] 子组件缺少 :key，路由 "${currentCacheKey}" 与 "${cacheKey}" 复用了同一 vnode，` +
+              '旧缓存条目已删除。请给 router-view 的子组件加 :key="$route.fullPath"。'
+          )
+        }
+        cache.delete(currentCacheKey)
+        keys.delete(currentCacheKey)
+      }
+      currentCacheKey = cacheKey
+
       let cachedVNode = cache.get(cacheKey)
 
-      if (cachedVNode && consumePageRefresh(cacheKey)) {
-        // 到达时决定不用缓存：清除旧实例（卸载需延迟到 post，渲染期不能同步卸载），
-        // 本次全新渲染并覆盖缓存条目
+      // 缓存条目与当前子组件类型不匹配（cacheKey 覆盖到不同组件、或同一
+      // key 下组件被替换）：实例不可跨组件复用，按未命中处理并清理旧条目，
+      // 否则 activate 内 patch 会在同型判断上走入卸载分支
+      if (cachedVNode && cachedVNode.type !== vnode.type) {
         const stale = cachedVNode
+        const staleComponent = stale.component
         cache.delete(cacheKey)
         keys.delete(cacheKey)
         if (!current || !isSameVNodeType(stale, current)) {
-          queuePostFlushCb(() => unmount(stale))
+          queuePostFlushCb(() => {
+            if (!staleComponent || !staleComponent.isUnmounted) {
+              unmount(stale)
+            }
+          })
+        } else {
+          resetShapeFlag(stale)
+        }
+        cachedVNode = undefined
+      }
+
+      if (cachedVNode && hasPageRefresh(cacheKey)) {
+        // 到达时决定不用缓存：清除旧实例（卸载需延迟到 post，渲染期不能同步卸载），
+        // 本次全新渲染并覆盖缓存条目。此处仅窥探标记（hasPageRefresh），待
+        // cacheSubtree 提交后再消费——render 可能被丢弃（HMR/Suspense 未决），
+        // render 期消费会丢失硬刷新意图
+        const stale = cachedVNode
+        const staleComponent = stale.component
+        cache.delete(cacheKey)
+        keys.delete(cacheKey)
+        if (!current || !isSameVNodeType(stale, current)) {
+          queuePostFlushCb(() => {
+            // 同一 flush 内可能发生多次 render 决策，防止重复卸载
+            if (!staleComponent || !staleComponent.isUnmounted) {
+              unmount(stale)
+            }
+          })
         } else {
           // 正停留在该页面时标记刷新：重置标志使离开时真实卸载
           resetShapeFlag(stale)

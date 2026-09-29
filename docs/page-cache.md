@@ -23,6 +23,7 @@ vue-page-stack 的遮挡类卡死根因不存在；同时按路由 key 缓存，
 | `exclude` | 同上 | 否 | — | 排除名单，优先于 include 命中 |
 | `max` | `number \| string` | 否 | — | 缓存条目上限，超出按 LRU 淘汰最久未访问的条目 |
 | `keyBy` | `'path' \| 'fullPath'` | 否 | `'path'` | 缓存 key 维度 |
+| `cacheKey` | `string` | 否 | — | 显式覆盖缓存 key（优先于 keyBy 推导）。用于嵌套路由/命名视图，如 `:cache-key="route.matched[1]?.path"`；include 匹配的是覆盖后的 key |
 
 **include 匹配的是缓存 key**：
 
@@ -59,7 +60,8 @@ const cacheRoutes = ['/order-list']
 
 ```ts
 markPageRefresh('/order-list')   // 标记：下一次到达该路由时跳过缓存全新渲染
-consumePageRefresh(path)         // 组件内部在 render 期消费（勿手动调用）
+hasPageRefresh(path)             // 窥探标记（不消费）
+consumePageRefresh(path)         // 消费标记（组件在渲染提交后内部调用，勿手动调用）
 clearPageRefresh()               // 清空全部标记
 ```
 
@@ -100,13 +102,20 @@ onMounted + onActivated 双路径 `takePendingSelection(type)` 消费。
    （不 unmount）；再次到达触发 activated（不重新 mounted）。
 2. **不在 include 的页面**：正常挂载/卸载，挂载**不触发** activated。
 3. **include/exclude 收紧修剪**：离屏缓存实例立即 unmount；当前活跃实例只重置
-   标志位，离开时走真实 unmount（deactivated 不触发）。
+   标志位，离开时走真实 unmount（deactivated 不触发）。max=1 修剪当前条目时
+   同理（每次跳转都是真实卸载重挂）。
 4. **max/LRU**：每次命中会把 key 标记为最新，超限淘汰最久未访问条目。
 5. **markPageRefresh 到达**：旧缓存实例 unmount、全新实例挂载并覆盖缓存条目。
+   标记在渲染**提交后**才消费（render 期仅窥探）——渲染被丢弃（HMR/Suspense
+   未决）时不会丢失硬刷新意图。
 6. **keyBy=path + query 变化**：同实例 deactivate → activate 一对钩子，状态保留。
 7. **vnode 钩子**：deactivate 触发 `onVnodeUnmounted`、activate 触发
    `onVnodeMounted`（vue-router RouterView 依赖此行为清理/回填实例引用）。
 8. **容器卸载**：所有缓存实例真实 unmount，当前活跃实例补触发 deactivated。
+9. **组件类型不匹配的缓存条目不复用**：cacheKey 覆盖到不同组件、或同 key 下
+   组件被替换时，旧条目自动清理，绝不跨组件复用实例。
+10. **未加 :key 的子组件跨路由复用**：自动检测并清理旧 key 条目（实例原地复用
+    不受影响），dev 期输出警告——请按推荐写法给子组件加 `:key`。
 
 ## 与 vue-router / Transition / Suspense 的协作
 
@@ -127,14 +136,19 @@ onMounted + onActivated 双路径 `takePendingSelection(type)` 消费。
 4. 组件依赖 Vue 渲染器内部字段（公开类型未暴露，运行时存在），升级 vue 大版本
    需对照 `libs/core/packages/runtime-core/src/components/KeepAlive.ts` 复核。
 5. 开发环境下实例暴露 `__v_cache`（Map），可用于测试/调试观察缓存态。
+6. 嵌套路由/命名视图需显式传 `cacheKey`（全局 route 与该层渲染内容不一致）。
+7. Transition `mode="out-in"` 在 happy-dom 下无法测试（官方 KeepAlive 同样
+   卡在离场阶段，环境限制）；需要验证时用真实浏览器。default 模式已覆盖单测。
 
 ## 测试
 
 ```bash
-npm run test:unit   # tests/unit/page-cache.spec.ts：21 个用例（生命周期/修剪/LRU/
-                    # 硬刷新/keyBy/离屏 DOM/Transition/Suspense/vue-router 守卫）
-npm run test:e2e    # tests/e2e/page-cache.e2e.spec.ts：6 个真实浏览器场景
-                    # （缓存往返/滚动恢复/push/replace/硬刷新/表单回填/快速导航无卡死）
+npm run test:unit   # tests/unit：34 个用例（生命周期/修剪/LRU/硬刷新提交语义/
+                    # keyBy/离屏 DOM/Transition/Suspense/vue-router 守卫/别名检测/
+                    # cacheKey 覆盖/类型不匹配防护/同 flush 双导航等）
+npm run test:e2e    # tests/e2e：7 个真实浏览器场景
+                    # （缓存往返/滚动恢复/push/replace/硬刷新/表单回填/快速导航
+                    #  无卡死/离屏 scroll 事件竞态回归）
 ```
 
 单元测试脚手架与断言工具（`mountApp` / `assertHookCalls` / `findPageCacheInstance`）

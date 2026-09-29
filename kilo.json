@@ -1,0 +1,17 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "@playwright/mcp@latest"],
+      "enabled": true
+    }
+  },
+  "permission": {
+    "playwright_browser_snapshot": "allow",
+    "playwright_browser_console_messages": "allow",
+    "playwright_browser_network_requests": "allow",
+    "playwright_browser_close": "allow",
+    "playwright_*": "ask"
+  }
+}
