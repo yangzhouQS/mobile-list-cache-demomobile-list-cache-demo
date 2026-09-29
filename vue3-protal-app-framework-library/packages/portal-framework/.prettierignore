@@ -1,0 +1,13 @@
+node_modules
+public
+dist
+docs
+test
+/src/utils/transForm
+**/ue-streaming-editor
+
+.vscode
+
+# doc
+.temp
+.cache

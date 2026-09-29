@@ -1,0 +1,9 @@
+{
+  "proxy": {
+    "port": 6003,
+    "mappings": {
+      "/nutui-app/": "http://localhost:9090/nutui-app/",
+      "*": "http://dev.mctech.vip"
+    }
+  }
+}

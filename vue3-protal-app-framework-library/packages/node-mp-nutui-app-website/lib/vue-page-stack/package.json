@@ -1,0 +1,65 @@
+{
+  "name": "vue-page-stack",
+  "version": "3.2.0",
+  "author": "hezf",
+  "type": "module",
+  "main": "./main.js",
+  "module": "./main.js",
+  "private": false,
+  "keywords": [
+    "vue3",
+    "vue-router",
+    "stack",
+    "navigation",
+    "manager",
+    "page"
+  ],
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.mjs --ignore-path .gitignore",
+    "lint-fix": "eslint . --ext .vue,.js,.jsx,.mjs --fix --ignore-path .gitignore",
+    "prepare": "husky install"
+  },
+  "lint-staged": {
+    "*.{vue,js,jsx,tsx}": "eslint . --ext .vue,.js,.jsx,.mjs --ignore-path .gitignore"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-customizable"
+    },
+    "cz-customizable": {
+      "config": "./.cz-config.cjs"
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hezhongfeng/vue-page-stack.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hezhongfeng/vue-page-stack/issues"
+  },
+  "homepage": "https://github.com/hezhongfeng/vue-page-stack#readme",
+  "dependencies": {
+    "@vue/shared": "^3.4.19",
+    "detect-browser-navigation-in-vue-router": "1.1.0"
+  },
+  "peerDependencies": {
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.2"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^17.6.3",
+    "commitizen": "^4.3.0",
+    "commitlint-config-cz": "^0.13.3",
+    "commitlint-config-git-commit-emoji": "^1.0.0",
+    "cz-conventional-changelog": "^3.3.0",
+    "cz-customizable": "^7.0.0",
+    "eslint": "^8.40.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.2.2",
+    "vite": "^5.4.16"
+  }
+}

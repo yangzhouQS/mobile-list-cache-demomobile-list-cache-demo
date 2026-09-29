@@ -1,0 +1,226 @@
+{
+  "id": "1116123",
+  "name": "protal-framework",
+  "font_family": "iconfont",
+  "css_prefix_text": "icon",
+  "description": "",
+  "glyphs": [
+    {
+      "icon_id": "12998892",
+      "name": "application",
+      "font_class": "application",
+      "unicode": "e600",
+      "unicode_decimal": 58880
+    },
+    {
+      "icon_id": "12998893",
+      "name": "bi",
+      "font_class": "bi",
+      "unicode": "e601",
+      "unicode_decimal": 58881
+    },
+    {
+      "icon_id": "12998894",
+      "name": "dashboard",
+      "font_class": "dashboard",
+      "unicode": "e603",
+      "unicode_decimal": 58883
+    },
+    {
+      "icon_id": "12998895",
+      "name": "materials",
+      "font_class": "materials",
+      "unicode": "e604",
+      "unicode_decimal": 58884
+    },
+    {
+      "icon_id": "12998896",
+      "name": "finance",
+      "font_class": "finance",
+      "unicode": "e605",
+      "unicode_decimal": 58885
+    },
+    {
+      "icon_id": "12998897",
+      "name": "labor",
+      "font_class": "labor",
+      "unicode": "e606",
+      "unicode_decimal": 58886
+    },
+    {
+      "icon_id": "12998898",
+      "name": "economy",
+      "font_class": "economy",
+      "unicode": "e607",
+      "unicode_decimal": 58887
+    },
+    {
+      "icon_id": "12998899",
+      "name": "machine",
+      "font_class": "machine",
+      "unicode": "e608",
+      "unicode_decimal": 58888
+    },
+    {
+      "icon_id": "12998900",
+      "name": "oa",
+      "font_class": "oa",
+      "unicode": "e609",
+      "unicode_decimal": 58889
+    },
+    {
+      "icon_id": "12998901",
+      "name": "labor-subcontract",
+      "font_class": "labor-subcontract",
+      "unicode": "e60a",
+      "unicode_decimal": 58890
+    },
+    {
+      "icon_id": "12998902",
+      "name": "contract",
+      "font_class": "contract",
+      "unicode": "e60b",
+      "unicode_decimal": 58891
+    },
+    {
+      "icon_id": "12998903",
+      "name": "progress",
+      "font_class": "progress",
+      "unicode": "e60c",
+      "unicode_decimal": 58892
+    },
+    {
+      "icon_id": "12998904",
+      "name": "quality",
+      "font_class": "quality",
+      "unicode": "e60d",
+      "unicode_decimal": 58893
+    },
+    {
+      "icon_id": "12998905",
+      "name": "pm",
+      "font_class": "pm",
+      "unicode": "e60e",
+      "unicode_decimal": 58894
+    },
+    {
+      "icon_id": "12998906",
+      "name": "report",
+      "font_class": "report",
+      "unicode": "e60f",
+      "unicode_decimal": 58895
+    },
+    {
+      "icon_id": "12998907",
+      "name": "doc",
+      "font_class": "doc",
+      "unicode": "e610",
+      "unicode_decimal": 58896
+    },
+    {
+      "icon_id": "12998908",
+      "name": "safety",
+      "font_class": "safety",
+      "unicode": "e611",
+      "unicode_decimal": 58897
+    },
+    {
+      "icon_id": "12998909",
+      "name": "quantity",
+      "font_class": "quantity",
+      "unicode": "e612",
+      "unicode_decimal": 58898
+    },
+    {
+      "icon_id": "12998910",
+      "name": "subcontract",
+      "font_class": "subcontract",
+      "unicode": "e613",
+      "unicode_decimal": 58899
+    },
+    {
+      "icon_id": "12998911",
+      "name": "setting",
+      "font_class": "setting",
+      "unicode": "e615",
+      "unicode_decimal": 58901
+    },
+    {
+      "icon_id": "12998912",
+      "name": "party",
+      "font_class": "party",
+      "unicode": "e616",
+      "unicode_decimal": 58902
+    },
+    {
+      "icon_id": "12998913",
+      "name": "task",
+      "font_class": "task",
+      "unicode": "e617",
+      "unicode_decimal": 58903
+    },
+    {
+      "icon_id": "13133810",
+      "name": "审批",
+      "font_class": "shenpi",
+      "unicode": "e618",
+      "unicode_decimal": 58904
+    },
+    {
+      "icon_id": "593473",
+      "name": "产品",
+      "font_class": "production",
+      "unicode": "e614",
+      "unicode_decimal": 58900
+    },
+    {
+      "icon_id": "1009874",
+      "name": "department",
+      "font_class": "department",
+      "unicode": "e629",
+      "unicode_decimal": 58921
+    },
+    {
+      "icon_id": "1393621",
+      "name": "company",
+      "font_class": "company",
+      "unicode": "e6e2",
+      "unicode_decimal": 59106
+    },
+    {
+      "icon_id": "11488267",
+      "name": "company-fill",
+      "font_class": "specialized",
+      "unicode": "e781",
+      "unicode_decimal": 59265
+    },
+    {
+      "icon_id": "5121520",
+      "name": "文件夹",
+      "font_class": "folder",
+      "unicode": "e64b",
+      "unicode_decimal": 58955
+    },
+    {
+      "icon_id": "1261708",
+      "name": "flag",
+      "font_class": "project",
+      "unicode": "e680",
+      "unicode_decimal": 59008
+    },
+    {
+      "icon_id": "5634312",
+      "name": "project-diagram",
+      "font_class": "command",
+      "unicode": "f08c",
+      "unicode_decimal": 61580
+    },
+    {
+      "icon_id": "5744737",
+      "name": "org",
+      "font_class": "group",
+      "unicode": "e602",
+      "unicode_decimal": 58882
+    }
+  ]
+}

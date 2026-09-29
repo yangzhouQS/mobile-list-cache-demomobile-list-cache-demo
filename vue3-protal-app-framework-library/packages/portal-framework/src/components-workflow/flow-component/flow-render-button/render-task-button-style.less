@@ -1,0 +1,62 @@
+.extra-popup-content {
+}
+
+.extra-popup-container{
+  padding-bottom: 20px !important;
+}
+
+/*
+ * 签字和备注填写区域
+ * 凸起在 box 顶部外侧，不遮挡内部按钮
+ * 注意：必须放在 nut-box 外部，因为 nut-box 自带 overflow:auto 会裁剪超出内容
+ */
+.button-extra-container {
+  position: relative;
+  height: 24px;
+  display: flex;
+  justify-content: center;
+
+  .button-extra__title {
+    position: absolute;
+    width: 140px;
+    /* 底边对齐 wrapper 顶部，使整个区域凸起在 box 上方 */
+    height: 23px;
+    background: var(--nut-fill-color-extra-light);
+    /* 顶部圆角，底部直角贴合 box */
+    border-radius: 8px 8px 0 0;
+    /* 阴影增强凸起立体感 */
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+}
+.extra-textarea{
+  border: 1px solid var(--nut-border-color-darker);
+  border-radius: 4px;
+}
+
+/*
+ * 签字照片预览区域
+ * 提供带边框的容器，让预览照片有合适的展示空间
+ */
+.signature-preview-wrap {
+  border: 1px solid var(--nut-border-color);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--nut-fill-color-extra-light);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 80px;
+
+  .signature-preview-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    object-fit: contain;
+  }
+}

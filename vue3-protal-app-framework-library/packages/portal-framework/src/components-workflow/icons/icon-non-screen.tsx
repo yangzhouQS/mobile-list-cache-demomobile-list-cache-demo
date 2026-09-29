@@ -1,0 +1,30 @@
+import { defineComponent } from "vue";
+
+/**
+ * 退出全屏图标组件
+ */
+export const IconNonScreen = defineComponent({
+  name: "IconNonScreen",
+  setup(_props, { attrs }) {
+    return () => {
+      return (
+        <svg
+          {...attrs}
+          class="icon"
+          viewBox="0 0 1024 1024"
+          version="1.1"
+          xmlns="http://www.w3.org/2000/svg"
+          width={(attrs.width as number) ?? 30}
+          height={(attrs.height as number) ?? 30}
+        >
+          <path
+            d="M142.4 96.8l-44.8 44.8 173.6 174.4-68 68H384V203.2l-67.2 67.2zM752.8 316l173.6-174.4-44.8-44.8-174.4 173.6-67.2-67.2V384h180.8zM270.4 707.2l-169.6 170.4 44.8 49.6 170.4-174.4 68 68V640H203.2zM820.8 640H640v180.8l68-68 170.4 174.4 44.8-49.6-169.6-170.4z"
+            fill="#165dff"
+          />
+        </svg>
+      );
+    };
+  }
+});
+
+export default IconNonScreen;

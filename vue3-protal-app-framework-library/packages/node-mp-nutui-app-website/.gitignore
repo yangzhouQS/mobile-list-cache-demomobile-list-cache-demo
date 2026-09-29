@@ -1,0 +1,9 @@
+node_modules/
+dist/
+package-lock.json
+yarn.lock
+.framework
+pnpm-lock.yaml
+.idea
+local-conf.bat
+*.log
