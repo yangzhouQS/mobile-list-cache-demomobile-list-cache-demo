@@ -38,6 +38,38 @@ export const router = createRouter({
       name: 'optionSelect',
       component: () => import('../views/select/option-select.vue'),
       meta: { title: '选择' }
+    },
+    {
+      path: '/stock',
+      name: 'stock',
+      component: () => import('../views/stock/stock-layout.tsx'),
+      meta: { title: '库存管理' },
+      children: [
+        {
+          path: 'list',
+          name: 'stockList',
+          component: () => import('../views/stock/stock-list.tsx'),
+          meta: { title: '库存列表' }
+        },
+        {
+          path: 'list/detail/:id',
+          name: 'stockDetail',
+          component: () => import('../views/stock/stock-detail.tsx'),
+          meta: { title: '库存详情' }
+        },
+        {
+          path: 'list/edit/:id',
+          name: 'stockEdit',
+          component: () => import('../views/stock/stock-edit.tsx'),
+          meta: { title: '库存编辑' }
+        },
+        {
+          path: 'report',
+          name: 'stockReport',
+          component: () => import('../views/stock/stock-report.tsx'),
+          meta: { title: '库存报表' }
+        }
+      ]
     }
   ]
 })

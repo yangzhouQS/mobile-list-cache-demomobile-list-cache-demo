@@ -16,9 +16,14 @@
         <div class="home-scenario-title">场景三：编辑返回策略可配置</div>
         <div class="home-scenario-desc">编辑页默认返回保持位置；可通过开关指定保存后刷新列表</div>
       </div>
+      <div class="home-scenario">
+        <div class="home-scenario-title">场景四：三级路由 + TSX</div>
+        <div class="home-scenario-desc">库存模块为嵌套路由（布局 + 二级列表 + 三级详情/编辑），全部页面用 TSX 开发，列表由布局内嵌套 PageCache 缓存</div>
+      </div>
     </div>
 
     <nut-button block type="primary" size="large" @click="goOrderList">进入订单列表</nut-button>
+    <nut-button block size="large" class="home-gap" @click="goStockList">进入库存模块（三级路由 TSX）</nut-button>
   </div>
 </template>
 
@@ -31,6 +36,10 @@ const router = useRouter()
 
 const goOrderList = () => {
   router.push({ path: '/order-list' })
+}
+
+const goStockList = () => {
+  router.push({ path: '/stock/list' })
 }
 </script>
 
@@ -58,6 +67,10 @@ const goOrderList = () => {
 
   .home-scenarios {
     flex: 1;
+  }
+
+  .home-gap {
+    margin-top: 12px;
   }
 
   .home-scenario {

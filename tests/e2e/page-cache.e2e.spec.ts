@@ -207,3 +207,95 @@ test('scroll position survives repeated detail round-trips (offscreen scroll-eve
       .toBeGreaterThan(400)
   }
 })
+
+/**
+ * 三级路由（TSX 库存模块）场景：
+ * 布局内嵌套 PageCache 缓存叶子列表页，三级详情/编辑往返、push/replace 到达、
+ * 报表同层切换均命中嵌套缓存；顶层 rootKey 用 matched[0].path 保证布局不因
+ * 叶子路由切换而重建（否则嵌套缓存随布局销毁）。
+ */
+async function gotoStockList(page: Page) {
+  await page.goto('/')
+  await page.locator('.nut-button', { hasText: '库存模块' }).click()
+  await expect(page.locator('.stock-card').first()).toBeVisible()
+}
+
+async function stockRequestCount(page: Page): Promise<number> {
+  const text = await page.locator('.stock-stats span').first().textContent()
+  return Number(/(\d+)/.exec(text ?? '')?.[1] ?? NaN)
+}
+
+test('nested-route TSX module: leaf list cached by inner PageCache across detail/edit round-trips', async ({ page }) => {
+  await gotoStockList(page)
+
+  const scrollEl = page.locator('.stock-scroll')
+  await scrollEl.evaluate((el) => {
+    el.scrollTop = 500
+  })
+  await expect
+    .poll(() => scrollEl.evaluate((el) => Math.round(el.scrollTop)))
+    .toBeGreaterThan(400)
+  const countBefore = await stockRequestCount(page)
+
+  // 三级详情往返（点击滚动后仍可见的卡片）
+  await page.locator('.stock-card').nth(7).click()
+  await expect(page.getByText('库存编号')).toBeVisible()
+  await page.locator('.nut-button', { hasText: 'back 返回列表' }).click()
+  await expect(page.locator('.stock-card').first()).toBeVisible()
+  await expect
+    .poll(() => scrollEl.evaluate((el) => Math.round(el.scrollTop)))
+    .toBeGreaterThan(400)
+  expect(await stockRequestCount(page)).toBe(countBefore)
+
+  // 三级编辑 -> 取消返回（保持位置）
+  await page.locator('.stock-card-btn').nth(5).click()
+  await expect(page.getByText('库存数量（吨）')).toBeVisible()
+  await page.locator('.nut-button', { hasText: '取消返回' }).click()
+  await expect(page.locator('.stock-card').first()).toBeVisible()
+  await expect
+    .poll(() => scrollEl.evaluate((el) => Math.round(el.scrollTop)))
+    .toBeGreaterThan(400)
+  expect(await stockRequestCount(page)).toBe(countBefore)
+
+  // 同层报表切换往返：布局复用，嵌套缓存保留
+  await page.locator('.stock-header-action').click()
+  await expect(page.getByText('库存汇总报表')).toBeVisible()
+  await page.locator('.stock-header-action', { hasText: '回列表' }).click()
+  await expect(page.locator('.stock-card').first()).toBeVisible()
+  await expect
+    .poll(() => scrollEl.evaluate((el) => Math.round(el.scrollTop)))
+    .toBeGreaterThan(400)
+  expect(await stockRequestCount(page)).toBe(countBefore)
+})
+
+test('nested-route TSX module: push/replace arrival and hard refresh work with inner PageCache', async ({ page }) => {
+  await gotoStockList(page)
+
+  // 详情页 push 到列表：命中嵌套缓存
+  await page.locator('.stock-card').nth(3).click()
+  await expect(page.getByText('库存编号')).toBeVisible()
+  await page.locator('.nut-button', { hasText: 'push 到列表' }).click()
+  await expect(page.locator('.stock-card').first()).toBeVisible()
+  const countBefore = await stockRequestCount(page)
+
+  // 详情页 replace 到列表：同样命中
+  await page.locator('.stock-card').nth(3).click()
+  await expect(page.getByText('库存编号')).toBeVisible()
+  await page.locator('.nut-button', { hasText: 'replace 到列表' }).click()
+  await expect(page.locator('.stock-card').first()).toBeVisible()
+  expect(await stockRequestCount(page)).toBe(countBefore)
+
+  // 编辑开启硬刷新开关 -> 保存返回：嵌套 PageCache 走 markPageRefresh 全新渲染。
+  // 踩坑：真实点击 nut-switch 后必须等其状态提交再点保存——立即点击时保存按钮
+  // 的 click 偶发不触发（无 JS 报错、页面停在编辑页），合成 click 无此问题。
+  await page.locator('.stock-card-btn').nth(4).click()
+  await expect(page.getByText('库存数量（吨）')).toBeVisible()
+  await page.locator('.nut-switch').click()
+  await page.waitForTimeout(300)
+  await page.locator('.nut-button', { hasText: '保存并返回' }).click()
+  await expect(page.locator('.stock-card').first()).toBeVisible()
+  expect(await stockRequestCount(page)).toBe(countBefore + 1)
+  await expect
+    .poll(() => page.locator('.stock-scroll').evaluate((el) => Math.round(el.scrollTop)))
+    .toBeLessThan(10)
+})

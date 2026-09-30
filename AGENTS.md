@@ -31,13 +31,15 @@ src/
   utils/page-cache-control.ts # markPageRefresh 等硬刷新标记（普通 Set，非响应式）
   utils/list-keep-alive.ts    # 列表页滚动保存/恢复 + 刷新标记（onActivated 钩子）
   utils/selection-holder.ts   # 跨页选择结果暂存（选择页 -> 表单页回填）
-  router/index.ts             # hash 路由，6 个路由，懒加载
-  views/                      # home / order-list / order-add / order-detail / order-edit / option-select
+  router/index.ts             # hash 路由（order 平级 + stock 嵌套三级），懒加载
+  views/
+    order/                    # 平级路由页面（.vue）
+    select/                   # 选择页（.vue）
+    stock/                    # ★ 三级路由 TSX 模块（布局 + 列表/详情/编辑/报表）
 tests/
   unit/page-cache.spec.ts     # 参照 vue/core KeepAlive.spec.ts 的 30 个用例
   unit/page-cache-control.spec.ts
-  e2e/page-cache.e2e.spec.ts  # 7 个真实浏览器场景
-libs/                         # 参考源码（vue core、vue-router、vue-page-stack），只读，勿改勿引
+  e2e/page-cache.e2e.spec.ts  # 9 个真实浏览器场景（含三级路由嵌套缓存两组）
 ```
 
 组件详细文档见 `docs/page-cache.md`。
@@ -62,6 +64,14 @@ libs/                         # 参考源码（vue core、vue-router、vue-page-
 6. **两类自动防护勿删**：缓存条目与子组件类型不匹配时按未命中清理（防跨组件
    复用实例导致 activate patch 崩溃）；未加 :key 的子组件跨路由复用时清理旧
    key 条目并 dev 告警（防多缓存条目别名同一实例）。
+7. **嵌套路由下顶层 router-view 的 key 必须用 rootKey 策略**（app.vue）：
+   `matched.length > 1 ? matched[0].path : fullPath`。若统一用 fullPath，
+   三级页面切换时 key 变化会把布局组件（连同其内部的嵌套 PageCache 与全部
+   叶子缓存）卸载重建——列表缓存失效（已实测踩坑）。单级路由保持 fullPath
+   语义不变。TSX 嵌套写法参考 `views/stock/stock-layout.tsx`。
+8. **嵌套 PageCache 的生命周期绑定在宿主布局上**：离开该模块（布局卸载）时
+   叶子缓存随之清空，重进模块列表重新挂载——这是"模块级缓存随布局存亡"的
+   预期语义，非 bug；如需跨模块保留，把布局纳入顶层 PageCache 并配 cacheKey。
 
 ## 代码与提交约定
 
@@ -79,7 +89,7 @@ libs/                         # 参考源码（vue core、vue-router、vue-page-
   当前活跃页面时，离开走真实 unmount（deactivated 不触发）。
 - `findPageCacheInstance(root)` 可拿到组件实例读取 dev 期 `__v_cache` 断言缓存态。
 
-**E2E 测试**（Playwright，两个已踩过的坑）：
+**E2E 测试**（Playwright，已踩过的坑）：
 1. NutUI 组件渲染为 `<view>` 自定义标签而非 `<button>`：`getByRole('button')`
    匹配不到，用 `page.locator('.nut-button', { hasText: '...' })`。
 2. Playwright 点击前会把目标自动滚动进可视区：验证"滚动位置恢复"类场景时，
@@ -89,6 +99,9 @@ libs/                         # 参考源码（vue core、vue-router、vue-page-
    循环导航用页头返回按钮（router.back），并在 `page.goto` 断言前保持 SPA 内跳转。
 4. Transition `mode="out-in"` 在 happy-dom 下离场永远不完成（官方 KeepAlive
    同样卡住，环境限制），单测只覆盖 default 模式，out-in 需真实浏览器验证。
+5. **真实点击 `nut-switch` 后紧接着点击按钮，按钮 click 偶发不触发**（无 JS
+   报错、无 console 输出，页面停在原地；元素合成 click 无此问题）。两次点击间
+   加 `waitForTimeout(300)` 规避，勿删。
 
 ## 其它
 

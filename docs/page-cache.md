@@ -126,6 +126,37 @@ onMounted + onActivated 双路径 `takePendingSelection(type)` 消费。
 - Suspense：`PageCache > Suspense > 异步组件` 场景下，延迟到 Suspense resolve
   后才缓存真实内容（对齐官方 #1621 修复）。
 
+## 嵌套路由（多级 router-view）下的使用
+
+参考 `src/views/stock/`（三级路由 TSX 模块）：
+
+```tsx
+// 布局组件（如 stock-layout.tsx）内——叶子页面由嵌套 PageCache 缓存
+<RouterView>
+  {{
+    default: ({ Component }) => (
+      <PageCache include={['/stock/list']}>
+        <Component key={route.fullPath} />
+      </PageCache>
+    )
+  }}
+</RouterView>
+```
+
+两条硬性约束：
+
+1. **顶层 router-view 的 key 用 rootKey 策略**（见 `app.vue`）：
+   `matched.length > 1 ? matched[0].path : fullPath`。否则三级页面切换时
+   fullPath 变化会把布局连同嵌套 PageCache 卸载重建，叶子缓存全部丢失。
+2. **嵌套缓存随布局存亡**：离开模块（布局卸载）时叶子缓存清空，重进列表
+   重新挂载。这是模块级缓存的预期语义；需要跨模块保留时将布局本身纳入
+   顶层 PageCache（include 布局路由并配 cacheKey）。
+
+TSX 支持依赖：`@vitejs/plugin-vue-jsx`（vite.config.ts）+ tsconfig 的
+`jsxImportSource: "vue"` 与 `allowImportingTsExtensions`。注意 TSX 中事件
+修饰符不可用（`onScrollPassive` 无效，用 `onScroll` 或自行 addEventListener
+加 passive）。
+
 ## 注意事项
 
 1. **不要**与 `<keep-alive>` 或 vue-page-stack 叠用包裹同一 router-view。
@@ -146,9 +177,9 @@ onMounted + onActivated 双路径 `takePendingSelection(type)` 消费。
 npm run test:unit   # tests/unit：34 个用例（生命周期/修剪/LRU/硬刷新提交语义/
                     # keyBy/离屏 DOM/Transition/Suspense/vue-router 守卫/别名检测/
                     # cacheKey 覆盖/类型不匹配防护/同 flush 双导航等）
-npm run test:e2e    # tests/e2e：7 个真实浏览器场景
+npm run test:e2e    # tests/e2e：9 个真实浏览器场景
                     # （缓存往返/滚动恢复/push/replace/硬刷新/表单回填/快速导航
-                    #  无卡死/离屏 scroll 事件竞态回归）
+                    # 无卡死/离屏 scroll 事件竞态回归/三级路由嵌套缓存×2）
 ```
 
 单元测试脚手架与断言工具（`mountApp` / `assertHookCalls` / `findPageCacheInstance`）
