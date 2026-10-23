@@ -36,8 +36,7 @@
       </div>
 
       <div v-if="isLoading" class="order-tip">加载中...</div>
-      <div v-else-if="orderList.length < total" class="order-tip" @click="loadMore">加载更多</div>
-      <div v-else class="order-tip">没有更多了</div>
+      <div v-else-if="orderList.length >= total" class="order-tip">没有更多了</div>
     </div>
   </div>
 </template>
@@ -93,6 +92,25 @@ const loadMore = async () => {
 
 const handleScroll = () => {
   currentScrollTop.value = Math.round(scrollRef.value?.scrollTop ?? 0)
+  maybeLoadMore()
+}
+
+/** 触底自动加载：距底部不足 60px 时追加下一页（替代手动"加载更多"按钮） */
+const maybeLoadMore = () => {
+  const el = scrollRef.value
+  if (
+    !el ||
+    // 离屏防护：PageCache 移入离屏容器瞬间 scrollTop/scrollHeight 全部归零并
+    // 异步派发 scroll 事件，此时 0+0 >= 0-60 恒成立，会误触触底加载
+    !el.isConnected ||
+    isLoading.value ||
+    orderList.value.length >= total.value
+  ) {
+    return
+  }
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 60) {
+    void loadMore()
+  }
 }
 
 /**

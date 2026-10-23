@@ -38,11 +38,13 @@ test.beforeEach(async ({ page }) => {
 test('list is cached across detail round-trip: no re-request, scroll restored', async ({ page }) => {
   await gotoList(page)
 
-  // 加载更多制造可滚动内容
-  await page.locator('.order-tip', { hasText: '加载更多' }).click()
+  // 滚动到底触发触底自动加载（原"加载更多"按钮已改为无限滚动）
+  const scrollEl = page.locator('.order-scroll')
+  await scrollEl.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
   await expect(page.locator('.order-card')).toHaveCount(30)
 
-  const scrollEl = page.locator('.order-scroll')
   await scrollEl.evaluate((el) => {
     el.scrollTop = 600
   })
