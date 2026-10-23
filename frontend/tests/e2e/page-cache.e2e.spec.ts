@@ -137,20 +137,36 @@ test('saving a new order hard-refreshes the list (fresh render, back to top)', a
   expect(await page.locator('.order-card').count()).toBe(cardsBefore)
 })
 
-test('add page keeps selections after visiting select pages', async ({ page }) => {
+test('add page keeps selections across multiple select round-trips', async ({ page }) => {
   await gotoList(page)
   await page.getByText('新增').click()
   await expect(page.getByText('新增订单')).toBeVisible()
 
-  // 去选择材料 -> 选第一项 -> 返回新增页
+  // 第一轮：选材料 -> 返回，材料回填
   await page.locator('.order-field', { hasText: '材料名称' }).click()
   await expect(page.getByText('选择材料')).toBeVisible()
   await page.locator('.select-option').first().click()
   await expect(page.getByText('新增订单')).toBeVisible()
+  const material = await fieldSelection(page, '材料名称')
+  expect(material).toBeTruthy()
 
-  const firstName = await page.locator('.order-field', { hasText: '材料名称' }).locator('.order-field-value-active').textContent()
-  expect(firstName).toBeTruthy()
+  // 第二轮：选供应商 -> 返回，供应商回填且第一轮材料不丢
+  // （回归背景：新增页未缓存，每次从选择页返回都重新挂载；选择暂存取出即删，
+  // 不恢复表单快照时多轮选择会让先前字段依次丢失）
+  await page.locator('.order-field', { hasText: '供应商' }).click()
+  await expect(page.getByText('选择供应商')).toBeVisible()
+  await page.locator('.select-option').first().click()
+  await expect(page.getByText('新增订单')).toBeVisible()
+  expect(await fieldSelection(page, '材料名称')).toBe(material)
+  expect(await fieldSelection(page, '供应商')).toBeTruthy()
 })
+
+/** 读取新增页某字段当前选中的回填值（未选中时元素不存在会超时） */
+const fieldSelection = (page: Page, label: string) =>
+  page
+    .locator('.order-field', { hasText: label })
+    .locator('.order-field-value-active')
+    .textContent()
 
 test('rapid navigation does not deadlock and cache still works', async ({ page }) => {  const pageErrors: string[] = []
   page.on('pageerror', (err) => pageErrors.push(String(err)))

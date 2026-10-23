@@ -60,7 +60,12 @@ import { onActivated, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { RectLeft, RectRight } from '@nutui/icons-vue'
 import { backToList } from '../../utils/list-keep-alive'
-import { takePendingSelection } from '../../utils/selection-holder'
+import {
+  clearPendingSelection,
+  ORDER_ADD_FORM_SNAPSHOT_KEY,
+  setPendingSelection,
+  takePendingSelection
+} from '../../utils/selection-holder'
 import { createOrder } from '../../api/order'
 import type { OptionItem } from '../../api/order'
 
@@ -77,8 +82,26 @@ const formData = reactive({
   num: ''
 })
 
-/** 消费选择页暂存的数据（缓存激活 / 重新挂载两种到达方式都覆盖） */
+interface AddFormSnapshot {
+  material: OptionItem | null
+  supplier: OptionItem | null
+  staff: OptionItem | null
+  num: string
+}
+
+/**
+ * 消费选择页暂存的数据（缓存激活 / 重新挂载两种到达方式都覆盖）：
+ * 先恢复"跳去选择页前"的表单快照（本页未缓存，返回即重新挂载、实例重建，
+ * 不恢复快照则多轮选择时先前字段依次丢失），再叠加本轮选择页写入的新值
+ */
 const consumeSelections = () => {
+  const snapshot = takePendingSelection<AddFormSnapshot>(ORDER_ADD_FORM_SNAPSHOT_KEY)
+  if (snapshot) {
+    formData.material = snapshot.material
+    formData.supplier = snapshot.supplier
+    formData.staff = snapshot.staff
+    formData.num = snapshot.num
+  }
   const material = takePendingSelection<OptionItem>('material')
   if (material) {
     formData.material = material
@@ -101,6 +124,8 @@ onMounted(consumeSelections)
 onActivated(consumeSelections)
 
 const goSelect = (type: string) => {
+  // 跳选择页前快照整个表单：返回重新挂载时由 consumeSelections 恢复
+  setPendingSelection(ORDER_ADD_FORM_SNAPSHOT_KEY, { ...formData })
   router.push({ path: `/select/${type}` })
 }
 
@@ -118,8 +143,7 @@ const handleSave = async () => {
       staffName: formData.staff?.name
     })
     // 新增成功：返回列表并跳过页面缓存（全新渲染、回到顶部）
-    backToList(router, { listKey: 'order-list', routePath: '/order-list', refresh: 'hard' })
-  } finally {
+    backToList(router, { listKey: 'order-list', routePath: '/order-list', refresh: 'hard' })} finally {
     isSaving.value = false
   }
 }

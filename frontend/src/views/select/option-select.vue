@@ -29,7 +29,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { RectLeft } from '@nutui/icons-vue'
-import { setPendingSelection } from '../../utils/selection-holder'
+import { setPendingSelection, clearPendingSelection, ORDER_ADD_FORM_SNAPSHOT_KEY } from '../../utils/selection-holder'
 import { fetchSelectOptions, SELECT_TYPE_TITLE_MAP } from '../../api/order'
 import type { OptionItem } from '../../api/order'
 
@@ -58,9 +58,11 @@ const handleSelect = (option: OptionItem) => {
 /**
  * 跨层放弃：从选择页直接回到列表（越过新增页）。
  * router.go(-2) 一次出栈两层，vue-page-stack 按栈深度正确恢复列表缓存；
- * 未打刷新标记 -> 列表不刷新、保持位置
+ * 未打刷新标记 -> 列表不刷新、保持位置。
+ * 同时清理表单快照：放弃新增后下次进入应是空表单，不复活旧表单
  */
 const abandonAll = () => {
+  clearPendingSelection(ORDER_ADD_FORM_SNAPSHOT_KEY)
   router.go(-2)
 }
 
