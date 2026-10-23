@@ -15,7 +15,8 @@ import { StocksModule } from './modules/stocks/stocks.module'
       database: process.env.DB_PATH ?? 'data/app.db',
       entities: [Order, Stock, Option],
       // 演示项目：由实体自动同步表结构
-      synchronize: true
+      synchronize: true,
+      logging: true,
     }),
     // SeedService 位于根模块：在此注册它需要的仓库（各业务模块内已有各自的 forFeature）
     TypeOrmModule.forFeature([Order, Stock, Option]),
